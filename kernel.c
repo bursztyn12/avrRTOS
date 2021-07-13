@@ -326,7 +326,7 @@ uint8_t setup_task(){
 				a_tcb[tcb_idx].state = RUNNABLE;
 				a_tcb[tcb_idx].c_queue = R;
 				enqueue(&q_runnable, &a_tcb[tcb_idx]);
-				}else{
+			}else{
 				a_tcb[tcb_idx].state = WAITING;
 				a_tcb[tcb_idx].c_queue = W;
 				enqueue(&q_wait, &a_tcb[tcb_idx]);
