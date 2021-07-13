@@ -5,6 +5,7 @@
  *  Author: bursztyn
  */ 
 #include <avr/io.h>
+#include <stddef.h>
 #include <avr/interrupt.h>
 
 #define F_CPU 1000000UL
@@ -14,7 +15,7 @@
 #include "usart.h"
 #include "kernel.h"
 
-tcb_t* tcb;
+static tcb_t* tcb = NULL;
 volatile uint8_t tx_status = 1;
 volatile uint8_t rx_status = 1;
 volatile uint8_t* tx_buffer;
@@ -61,7 +62,7 @@ void usart_tx(uint8_t type){
 	tcb = get_current_tcb();
 	if (usart_state == USART_BUSY){
 		// put to blocked queue
-		block_task(USART_BLOCKED);
+		task_block(USART_BLOCKED);
 	}
 	
 	usart_state = USART_BUSY;
@@ -70,12 +71,14 @@ void usart_tx(uint8_t type){
 	
 	UCSRB |= (1 << UDRIE);
 	
-	if (type == TX){
+	/*if (type == TX){
 		while(tx_status);
 	}else{
 		while(tx_status);
 		while(rx_status);
-	}
+	}*/
+	
+	task_suspend();
 	
 	tx_status = 1;
 	rx_status = 1;
@@ -89,11 +92,9 @@ void usart_tx(uint8_t type){
 void usart_rx(){
 	tcb = get_current_tcb();
 	if(usart_state == USART_BUSY){
-		block_task(USART_BLOCKED);
+		task_block(USART_BLOCKED);
 	}
-	enable_rxcie();
-	while(rx_status);
-	disable_rxcie();
+	task_suspend();
 }
 
 void usart_write(uint8_t data){
@@ -120,6 +121,7 @@ ISR(USART_UDRE_vect){
 	
 	if(tx_b_idx == tx_reserve_size){
 		tx_status = 0;
+		task_notify(tcb);
 	}else{
 		++tx_b_idx;
 		++tx_buffer;
@@ -134,6 +136,11 @@ ISR(USART_RXC_vect){
 	if (c_reserve_type != RX){
 		if (rx_b_idx == rx_reserve_size){
 			rx_status = 0;
+			if (c_reserve_type == TX_RX && rx_status == 0){
+				task_notify(tcb);
+			}else{
+				task_notify(tcb);
+			}
 		}else{
 			*rx_buffer = UDR;
 			++rx_b_idx;

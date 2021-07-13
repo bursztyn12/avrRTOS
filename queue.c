@@ -86,10 +86,8 @@ void update_q_wait(queue_t *q_w, queue_t *q_r){
 			if (t->state != BLOCKED && t->state != SUSPENDED){
 				t->timer -= 1;
 				if (t->timer == 0){
-					if (t->type == PERODIC){
-						t->timer = t->delay;
-						t->state = RESET;
-					}
+					t->timer = t->delay;
+					t->state = RESET;
 					update_q(q_w, q_r, t, prev, i, q_size);
 				}
 			}

@@ -35,12 +35,12 @@ void sds011_sleep(){
 	
 	if (sds011_state == SDS011_BUSY){
 		//put task to blocked queue
-		block_task(SDS011_BLOCKED);
+		task_block(SDS011_BLOCKED);
 	}
 	
 	sds011_state = SDS011_BUSY;
 	
-	setup_usart(m_sleep, 18, 0, 0, TX);
+	setup_usart(m_sleep, 1, 0, 0, TX);
 	
 	sds011_status = SDS011_SLEEP;
 	sds011_state = SDS011_IDLE;
@@ -50,7 +50,7 @@ void sds011_measure(){
 	tcb = get_current_tcb();
 	if (sds011_state == SDS011_BUSY){
 		//put task to blocked queue
-		block_task(SDS011_BLOCKED);
+		task_block(SDS011_BLOCKED);
 	}
 	
 	tcb->state = SUSPENDED;
@@ -71,7 +71,7 @@ void sds011_work(){
 	tcb = get_current_tcb();
 	if (sds011_state == SDS011_BUSY){
 		//put task to blocked queue
-		block_task(SDS011_BLOCKED);
+		task_block(SDS011_BLOCKED);
 	}
 	
 	tcb->state = SUSPENDED;

@@ -44,8 +44,10 @@ int main(void){
 	//_delay_ms(3000);
 	init_kernel();
 	
-	create_task(idle_0, PERODIC, 70);
-	create_task(idle_1, PERODIC, 15);
+	//create_task(idle_1, SINGLE, 0);
+	create_task(idle_3, SINGLE, 0);
+	//create_task(idle_1, PERODIC, 3);
+	
 	
 	start_kernel();
 }
