@@ -24,8 +24,8 @@ void twi_setup(uint8_t address, uint8_t *tx_buffer, uint8_t *rx_buffer, uint8_t 
 	twi_packet.address = address;
 	twi_packet.tx_buffer = tx_buffer;
 	twi_packet.tx_length = tx_length;
-	twi_packet.rx_buffer = rx_buffer;
-	twi_packet.rx_length = rx_length;
+	twi_packet.rx_buffer = rx_buffer - 1;
+	twi_packet.rx_length = rx_length - 1;
 	twi_packet.tx_idx = 0;
 	twi_packet.rx_idx = 0;
 	
