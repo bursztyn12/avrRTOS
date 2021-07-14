@@ -20,9 +20,10 @@
 #define ADDRESS_SDA					0x4A
 #define ADDRESS_CLK					0x4B
 
+#define CONST						0.0625
+
 uint8_t tmp102_init(uint8_t address);
-void tmp102_read(uint8_t reg);
-void tmp102_write(uint8_t reg);
+float tmp102_get_temp();
 
 struct tmp102{
 	uint8_t address;

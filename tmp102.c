@@ -10,7 +10,8 @@
 
 struct tmp102 tmp102;
 
-uint16_t temp_v;
+uint16_t temp_v = 0;
+uint8_t c_reg = 0;
 
 uint8_t tmp102_init(uint8_t address){
 	if (address < 0x48 && address > 0x4B){
@@ -20,15 +21,12 @@ uint8_t tmp102_init(uint8_t address){
 	return 0;
 }
 
-void tmp102_write(uint8_t reg){
+
+
+float tmp102_get_temp(){
+	c_reg = TEMPERATURE_REGISTER;
+	twi_setup(tmp102.address, &c_reg, tmp102.b_temp, 1, 2);
 	
-}
-
-void tmp102_read(uint8_t reg){
-	uint8_t tx_buffer[2] = {tmp102.address, reg};
-	twi_setup(tmp102.address, tx_buffer, tmp102.b_temp, 2, 2);
-}
-
-void tmp102_get_temp(){
-	tmp102_read(TEMPERATURE_REGISTER);
+	temp_v = ((*tmp102.b_temp) << 4) | (*(tmp102.b_temp+1) >> 4);
+	return temp_v * CONST;
 }

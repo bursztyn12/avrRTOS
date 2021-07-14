@@ -42,7 +42,6 @@
 
 struct twi_packet{
 	uint8_t address;
-	uint8_t payload;
 	uint8_t *tx_buffer;
 	uint8_t *rx_buffer;
 	uint8_t tx_length;
