@@ -28,7 +28,7 @@ measurment_t m = {
 	.pm10 = 0
 };
 
-tcb_t* tcb;
+struct tcb* tcb;
 
 void sds011_sleep(){
 	tcb = get_current_tcb();

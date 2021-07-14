@@ -15,7 +15,7 @@
 #include "usart.h"
 #include "kernel.h"
 
-static tcb_t* tcb = NULL;
+static struct tcb *tcb = NULL;
 volatile uint8_t tx_status = 1;
 volatile uint8_t rx_status = 1;
 volatile uint8_t* tx_buffer;
