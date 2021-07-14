@@ -3,13 +3,13 @@
 #include "queue.h"
 #include "usart.h"
 
-void init_queue(queue_t *q){
+void init_queue(struct queue  *q){
     q->head = NULL;
     q->tail = NULL;
 	q->q_size = 0;
 }
 
-void enqueue(queue_t *q, tcb_t *tcb){
+void enqueue(struct queue  *q, struct tcb *tcb){
     if(q->tail != NULL){
         q->tail->next_tcb = tcb;
     }
@@ -20,8 +20,8 @@ void enqueue(queue_t *q, tcb_t *tcb){
 	q->q_size += 1;
 }
 
-tcb_t* dequeue(queue_t *q){
-    tcb_t *tmp = NULL;
+struct tcb* dequeue(struct queue  *q){
+    struct tcb *tmp = NULL;
 	if (q->head == NULL){
 		return tmp;
     }
@@ -40,7 +40,7 @@ tcb_t* dequeue(queue_t *q){
     return tmp;
 }
 
-void update_q(queue_t *q, queue_t *q_r, tcb_t *t, tcb_t *prev, uint8_t i, uint8_t q_size){
+void update_q(struct queue  *q, struct queue  *q_r, struct tcb *t, struct tcb *prev, uint8_t i, uint8_t q_size){
 	if (i > 0){
 		if (i < q_size - 1){
 			prev->next_tcb = t->next_tcb;
@@ -58,12 +58,12 @@ void update_q(queue_t *q, queue_t *q_r, tcb_t *t, tcb_t *prev, uint8_t i, uint8_
 	t->next_tcb = NULL;
 }
 
-void update_q_blocked(queue_t *q_b, queue_t *q_r){
+void update_q_blocked(struct queue  *q_b, struct queue  *q_r){
 	if (q_b->q_size > 0){
 		uint8_t q_size = q_b->q_size;
 		uint8_t i = 0;
-		tcb_t *t = q_b->head;
-		tcb_t *prev = 0;
+		struct tcb *t = q_b->head;
+		struct tcb *prev = 0;
 		for(;i<q_size;i++){
 			if (t->state_desc == USART_BLOCKED){
 				if (get_usart_state()){
@@ -76,12 +76,12 @@ void update_q_blocked(queue_t *q_b, queue_t *q_r){
 	}
 }
 
-void update_q_wait(queue_t *q_w, queue_t *q_r){
+void update_q_wait(struct queue  *q_w, struct queue  *q_r){
 	if (q_w->q_size > 0){
 		uint8_t q_size = q_w->q_size;
 		uint8_t i = 0;
-		tcb_t *t = q_w->head;
-		tcb_t *prev = 0;
+		struct tcb *t = q_w->head;
+		struct tcb *prev = 0;
 		for(;i<q_size;i++){
 			if (t->state != BLOCKED && t->state != SUSPENDED){
 				t->timer -= 1;
@@ -97,11 +97,11 @@ void update_q_wait(queue_t *q_w, queue_t *q_r){
 	}
 }
 
-void update_q_runnable(queue_t *q){
+void update_q_runnable(struct queue  *q){
 	uint8_t q_size = q->q_size;
 	uint8_t i = 0;
-	tcb_t *t = q->head;
-	tcb_t *prev = 0;
+	struct tcb *t = q->head;
+	struct tcb *prev = 0;
 	for(;i<q_size;i++){
 		if(t->state == TERMINATED){
 			if (i > 0){

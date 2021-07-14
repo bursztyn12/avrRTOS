@@ -48,7 +48,8 @@ void init_kernel();
 void start_kernel();
 void init_drivers();
 
-typedef struct tcb_t{
+
+struct tcb{
 	void* sp;
 	void* sp_start;
 	uint8_t id;
@@ -56,16 +57,16 @@ typedef struct tcb_t{
 	uint8_t type;
 	uint16_t delay;
 	uint8_t timer;
-	struct tcb_t* next_tcb;
+	struct tcb* next_tcb;
 	task_fun fun;
 	uint8_t state_desc;
 	uint8_t queue_state;
 	uint8_t c_queue;
 	uint8_t tick_count;
-}tcb_t;
+};
 
-tcb_t* get_current_tcb();
-void task_notify(tcb_t* t);
+struct tcb* get_current_tcb();
+void task_notify(struct tcb *tcb);
 
 #define K_TCB_DEFINE_SIGNLE(_f) \
 {													\

@@ -15,7 +15,7 @@
 #include "usart.h"
 
 uint8_t tcb_idx = 0;
-static tcb_t a_tcb[MAX_TASKS];
+static struct tcb a_tcb[MAX_TASKS];
 
 void* start = (void *)RAMEND-0x20;
 void *_p = 0;
@@ -24,10 +24,10 @@ void *_c_sp = 0;
 static void scheduler(void);
 task_fun sched = scheduler;
 
-queue_t q_runnable;
-queue_t q_wait;
-queue_t q_blocked;
-queue_t q_suspended;
+struct queue  q_runnable;
+struct queue  q_wait;
+struct queue  q_blocked;
+struct queue  q_suspended;
 
 volatile uint8_t k_tick = 1;
 
@@ -105,7 +105,7 @@ static void init_sp(task_fun f){
 	);
 }
 
-tcb_t *tcb;
+struct tcb *tcb;
 
 static void context_restore() __attribute__((naked));
 static void context_restore(){
@@ -296,7 +296,7 @@ void task_suspend(){
 	__asm__("ijmp				\n\t" :: "z"(scheduler));
 }
 
-void task_notify(tcb_t* t){
+void task_notify(struct tcb *t){
 	t->state = RUNNABLE;
 	
 	enqueue(&q_runnable, t);
@@ -308,7 +308,7 @@ void init_drivers(){
 	usart_init();
 }
 
-tcb_t* get_current_tcb(){
+struct tcb* get_current_tcb(){
 	return tcb;
 }
 
