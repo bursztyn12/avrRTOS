@@ -44,8 +44,6 @@ float tmp102_get_temp(){
 	
 	c_reg = TEMPERATURE_REGISTER;
 	twi_setup(tmp102.address, &c_reg, tmp102.b_temp, 1, 2, MULTIPLE_BYTE_READ);
-
-	PORTA |= (1 << 6);
 	
 	temp_v = ((*tmp102.b_temp) << 4) | (*(tmp102.b_temp+1) >> 4);
 	
