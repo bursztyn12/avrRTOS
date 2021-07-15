@@ -12,8 +12,8 @@
 
 #include "kernel.h"
 #include "queue.h"
-#include "usart.h"
-#include "twi.h"
+#include "drivers/usart.h"
+#include "drivers/twi.h"
 
 uint8_t tcb_idx = 0;
 static struct tcb a_tcb[MAX_TASKS];

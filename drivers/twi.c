@@ -11,7 +11,7 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include "twi.h"
-#include "kernel.h"
+#include "../kernel.h"
 
 struct twi_packet twi_packet;
 static struct tcb *tcb;

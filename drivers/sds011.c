@@ -7,7 +7,7 @@
 
 #include "sds011.h"
 #include "usart.h"
-#include "kernel.h"
+#include "../kernel.h"
 #define  F_CPU 1000000UL
 #include <util/delay.h>
 

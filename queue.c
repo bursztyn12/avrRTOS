@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include "kernel.h"
 #include "queue.h"
-#include "usart.h"
+#include "drivers/usart.h"
 
 void init_queue(struct queue  *q){
     q->head = NULL;

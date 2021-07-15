@@ -10,10 +10,10 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
-#include "println.h"
+#include "drivers/println.h"
 #include "kernel.h"
-#include "sds011.h"
-#include "tmp102.h"
+#include "drivers/sds011.h"
+#include "drivers/tmp102.h"
 
 void idle_0(){
 	PORTA ^= (1<<1);

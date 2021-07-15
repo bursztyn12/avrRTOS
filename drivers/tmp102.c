@@ -7,7 +7,7 @@
 
 #include "tmp102.h"
 #include "twi.h"
-#include "kernel.h"
+#include "../kernel.h"
 
 struct tmp102 tmp102;
 

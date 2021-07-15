@@ -13,7 +13,7 @@
 #include <util/delay.h>
 
 #include "usart.h"
-#include "kernel.h"
+#include "../kernel.h"
 
 static struct tcb *tcb = NULL;
 volatile uint8_t tx_status = 1;
