@@ -1,4 +1,4 @@
-/*
+/*/*
  * twi.h
  *
  * Created: 13.07.2021 13:02:11
@@ -19,6 +19,8 @@
 #define TWI_READ_PAYLOAD			6
 #define TWI_RP_START				7
 
+#define TWI_SUCCESS					0
+
 //twi status codes for master tx
 #define TWI_STA_TX					0x08 //A START condition has been transmitted.
 #define TWI_RP_STA_TX				0x10 //A repeated START condition has been transmitted.
@@ -34,11 +36,14 @@
 #define TWI_PACKET_RX_ACK			0x50 //Data byte has been received; ACK has been returned
 #define TWI_PACKET_RX_NACK			0x58 //Data byte has been received; NACK has been returned
 
+#define TWI_IDLE					0
+#define TWI_BUSY					1
+
 //twi modes
 #define SINGLE_BYTE_READ			0
 #define MULTIPLE_BYTE_READ			1
 #define SINGLE_BYTE_WRITE			2
-#define MLTIPLE_BYTE_WRITE			3
+#define MULTIPLE_BYTE_WRITE			3
 
 struct twi_packet{
 	uint8_t address;
@@ -48,15 +53,13 @@ struct twi_packet{
 	int8_t rx_length;
 	uint8_t tx_idx;
 	uint8_t rx_idx;
+	uint8_t error_code;
+	uint8_t is_error;
 };
 
-void twi_write_address(uint8_t address);
-void twi_write_packet(uint8_t packet);
-uint8_t twi_read_packet();
-void twi_stop_start();
+
+void twi_init();
 void twi_start();
-void twi_stop();
-void start_twi();
-void twi_setup(uint8_t address, uint8_t *tx_buffer, uint8_t *rx_buffer, uint8_t tx_length, uint8_t rx_length);
+void twi_setup(uint8_t address, uint8_t *tx_buffer, uint8_t *rx_buffer, uint8_t tx_length, uint8_t rx_length, uint8_t mode);
 
 #endif /* TWI_H_ */

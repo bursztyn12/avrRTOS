@@ -30,14 +30,6 @@ uint8_t usart_state = USART_IDLE;
 
 uint8_t c_reserve_type = RX;
 
-void enable_rxcie(){
-	UCSRB |= (1 << RXCIE);
-}
-
-void disable_rxcie(){
-	UCSRB &= ~(1 << RXCIE);
-}
-
 uint8_t get_usart_state(){
 	return usart_state;
 }

@@ -11,31 +11,33 @@
 
 #include <avr/io.h>
 
-#define INIT			0
-#define REFRESH			1
+#define INIT					0
+#define REFRESH					1
 
 //task states
-#define SUSPENDED		0
-#define RESET			1
-#define RUNNABLE		2
-#define BLOCKED			3
-#define WAITING			4
-#define USART_BLOCKED	5
-#define SDS011_BLOCKED	6
-#define TERMINATED		7
+#define SUSPENDED				0
+#define RESET					1
+#define RUNNABLE				2
+#define BLOCKED					3
+#define WAITING					4
+#define USART_BLOCKED			5
+#define SDS011_BLOCKED			6
+#define TWI_BLOCKED				7
+#define TMP102_BLOCKED			8
+#define TERMINATED				50
 
 //task types
-#define SINGLE			0
-#define FOREVER			1
-#define PERODIC			2
-#define KERNEL			3
+#define SINGLE					0
+#define FOREVER					1
+#define PERODIC					2
+#define KERNEL					3
 
 //current queue
-#define R				0
-#define W				1
-#define B				2
+#define R						0
+#define W						1
+#define B						2
 
-#define MAX_TASKS		6
+#define MAX_TASKS				6
 
 typedef void (*task_fun)(void);
 

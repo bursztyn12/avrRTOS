@@ -13,6 +13,7 @@
 #include "println.h"
 #include "kernel.h"
 #include "sds011.h"
+#include "tmp102.h"
 
 void idle_0(){
 	PORTA ^= (1<<1);
@@ -40,14 +41,19 @@ void idle_4(){
 	sds011_sleep();
 }
 
+void tmp(){
+	tmp102_init(GND);
+	tmp102_get_temp();
+}
+
 int main(void){
-	//_delay_ms(3000);
+	//DDRA = 0xFF;
+	//_delay_ms(10000);
 	init_kernel();
 	
-	//create_task(idle_1, SINGLE, 0);
-	create_task(idle_3, SINGLE, 0);
-	//create_task(idle_1, PERODIC, 3);
-	
+	//create_task(idle_, SINGLE, 0);
+	create_task(idle_1, PERODIC, 20);
+	create_task(tmp, SINGLE, 100);
 	
 	start_kernel();
 }
