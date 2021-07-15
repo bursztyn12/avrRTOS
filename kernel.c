@@ -13,6 +13,7 @@
 #include "kernel.h"
 #include "queue.h"
 #include "usart.h"
+#include "twi.h"
 
 uint8_t tcb_idx = 0;
 static struct tcb a_tcb[MAX_TASKS];
@@ -306,6 +307,7 @@ void init_drivers(){
 	DDRA = 0xFF;
 	initTimer();
 	usart_init();
+	twi_init();
 }
 
 struct tcb* get_current_tcb(){
