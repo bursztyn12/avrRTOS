@@ -52,6 +52,6 @@ float tmp102_get_temp(){
 	temp_v = ((*tmp102.b_temp) << 4) | (*(tmp102.b_temp+1) >> 4);
 	
 	tmp102_status = TMP102_IDLE;
-	
-	return (float)temp_v * 0.0625;
+
+	return temp_v * CONST;
 }
