@@ -89,6 +89,7 @@ ISR(TWI_vect){
 			if (twi_mode == SINGLE_BYTE_WRITE || twi_mode == MULTIPLE_BYTE_WRITE){
 				//stop
 				TWCR = (1 << TWEN) | (1 << TWSTO) | (1 << TWINT);
+				uart_tcb->w_state = WORK_F;
 				task_notify(twi_tcb);
 			}else{
 				//reapeted start
@@ -112,6 +113,7 @@ ISR(TWI_vect){
 		if (twi_packet.rx_idx == twi_packet.rx_length){
 			PORTA |= (1 << 0);
 			TWCR = (1 << TWEN) | (1 << TWSTO) | (1 << TWINT);
+			uart_tcb->w_state = WORK_F;
 			task_notify(twi_tcb);
 		}else{
 			TWCR = (1 << TWEN) | (1 << TWIE) | (1 << TWINT) | (1 << TWEA);
