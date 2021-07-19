@@ -8,8 +8,7 @@
 #include "sds011.h"
 #include "usart.h"
 #include "kernel.h"
-#define  F_CPU 1000000UL
-#include <util/delay.h>
+#include "println.h"
 
 uint8_t sds011_state = SDS011_IDLE;
 uint8_t sds011_status = SDS011_WORK;
@@ -40,7 +39,7 @@ void sds011_sleep(){
 	
 	sds011_state = SDS011_BUSY;
 	
-	setup_usart(m_sleep, 1, 0, 0, TX);
+	setup_usart(m_sleep, 18, 0, 0, TX);
 	
 	sds011_status = SDS011_SLEEP;
 	sds011_state = SDS011_IDLE;
@@ -59,8 +58,6 @@ void sds011_measure(){
 	
 	setup_usart(m_measure, 18, a_response, 9, TX_RX);
 	
-	tcb->state = RESET;
-	
 	sds011_status = SDS011_MEASURE;
 	sds011_state = SDS011_IDLE;
 	
@@ -74,20 +71,12 @@ void sds011_work(){
 		task_block(SDS011_BLOCKED);
 	}
 	
-	tcb->state = SUSPENDED;
-	
 	sds011_state = SDS011_BUSY;
 	
 	setup_usart(m_work, 18, 0, 0, TX);
 	
 	sds011_status = SDS011_WORK;
 	sds011_state = SDS011_IDLE;
-	
-	if(tcb->type == SINGLE){
-		tcb->state = TERMINATED;
-	}else if(tcb->type == SINGLE){
-		tcb->state = RESET;
-	}
 }
 
 measurment_t* sds011_process_measurment(){
@@ -101,6 +90,9 @@ measurment_t* sds011_process_measurment(){
 	
 	m.pm2_5 = pm2_5v;
 	m.pm10 = pm10v;
+	
+	println_flo(pm2_5v);
+	println_flo(pm10v);
 	
 	return &m;
 }

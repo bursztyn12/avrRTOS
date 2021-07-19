@@ -8,6 +8,7 @@
 #include "tmp102.h"
 #include "twi.h"
 #include "kernel.h"
+#include "println.h"
 
 struct tmp102 tmp102;
 
@@ -16,6 +17,7 @@ uint8_t c_reg = 0;
 uint8_t tmp102_status = TMP102_IDLE;
 
 uint8_t tmp102_init(uint8_t a0_conn){
+	
 	if (tmp102_status == TMP102_BUSY){
 		task_block(TMP102_BLOCKED);
 	}
@@ -42,12 +44,14 @@ float tmp102_get_temp(){
 		task_block(TMP102_BLOCKED);
 	}
 	
+	tmp102_status = TMP102_BUSY;
+	
 	c_reg = TEMPERATURE_REGISTER;
 	twi_setup(tmp102.address, &c_reg, tmp102.b_temp, 1, 2, MULTIPLE_BYTE_READ);
 	
 	temp_v = ((*tmp102.b_temp) << 4) | (*(tmp102.b_temp+1) >> 4);
 	
 	tmp102_status = TMP102_IDLE;
-	
+
 	return temp_v * CONST;
 }

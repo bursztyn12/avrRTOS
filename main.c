@@ -1,15 +1,11 @@
 /*
- * avr_kernel.c
+ * avrRTOS.c
  *
- * Created: 05.07.2021 13:32:20
+ * Created: 15.07.2021 22:12:53
  * Author : bursztyn
  */ 
 
-#define F_CPU 1000000UL
-
 #include <avr/io.h>
-#include <util/delay.h>
-#include <avr/interrupt.h>
 #include "println.h"
 #include "kernel.h"
 #include "sds011.h"
@@ -20,15 +16,8 @@ void idle_0(){
 }
 
 void idle_1(){
-	PORTA ^= (1<<2);
-}
-
-void idle_2(){
-	while(1){
-		for(uint8_t i=0;i<10;i++){
-			println("P2: @", i);
-		}
-	}
+	println_msg("P1");
+	println_flo(123.245);
 }
 
 void idle_3(){
@@ -36,14 +25,17 @@ void idle_3(){
 }
 
 void idle_4(){
+	PORTA ^= (1 << 5);
 	sds011_measure();
-	//sds011_process_measurment();
+	sds011_process_measurment();
 	sds011_sleep();
 }
 
 void tmp(){
+	PORTA ^= (1 << 5);
 	tmp102_init(GND);
-	tmp102_get_temp();
+	float f = tmp102_get_temp();
+	println_flo(f);
 }
 
 int main(void){
@@ -51,10 +43,10 @@ int main(void){
 	//_delay_ms(10000);
 	init_kernel();
 	
-	//create_task(idle_, SINGLE, 0);
-	create_task(idle_1, PERODIC, 20);
-	create_task(tmp, SINGLE, 100);
+	//create_task(idle_0, PERODIC, 2);
+	//create_task(idle_4, PERODIC, 3);
+	//create_task(idle_1, PERODIC, 4);
+	create_task(tmp, PERODIC, 500);
 	
 	start_kernel();
 }
-

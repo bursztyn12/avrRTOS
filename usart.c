@@ -7,15 +7,10 @@
 #include <avr/io.h>
 #include <stddef.h>
 #include <avr/interrupt.h>
-
-#define F_CPU 1000000UL
-
-#include <util/delay.h>
-
 #include "usart.h"
 #include "kernel.h"
 
-static struct tcb *tcb = NULL;
+static struct tcb* uart_tcb ;
 volatile uint8_t tx_status = 1;
 volatile uint8_t rx_status = 1;
 volatile uint8_t* tx_buffer;
@@ -51,24 +46,21 @@ void setup_usart(uint8_t *tx_b, uint8_t tx_size, uint8_t *rx_b, uint8_t rx_size,
 }
 
 void usart_tx(uint8_t type){
-	tcb = get_current_tcb();
+	uart_tcb = get_current_tcb();
 	if (usart_state == USART_BUSY){
 		// put to blocked queue
 		task_block(USART_BLOCKED);
 	}
 	
+	uart_tcb->w_state = WORK_S;
 	usart_state = USART_BUSY;
 	
 	UDR = *tx_buffer;
 	
-	UCSRB |= (1 << UDRIE);
+	++tx_buffer;
+	++tx_b_idx;
 	
-	/*if (type == TX){
-		while(tx_status);
-	}else{
-		while(tx_status);
-		while(rx_status);
-	}*/
+	UCSRB |= (1 << UDRIE);
 	
 	task_suspend();
 	
@@ -82,22 +74,11 @@ void usart_tx(uint8_t type){
 }
 
 void usart_rx(){
-	tcb = get_current_tcb();
+	uart_tcb = get_current_tcb();
 	if(usart_state == USART_BUSY){
 		task_block(USART_BLOCKED);
 	}
 	task_suspend();
-}
-
-void usart_write(uint8_t data){
-	while(!(UCSRA & (1 << UDRE)));
-	
-	UDR = data;
-}
-
-void usart_hex(uint8_t b){
-	b +=  b > 9 ? 'A' - 10 : '0';
-	usart_write(b);
 }
 
 void usart_init(){
@@ -113,13 +94,12 @@ ISR(USART_UDRE_vect){
 	
 	if(tx_b_idx == tx_reserve_size){
 		tx_status = 0;
-		task_notify(tcb);
+		uart_tcb->w_state = WORK_F;
+		task_notify(uart_tcb);
 	}else{
+		UDR = *tx_buffer;
 		++tx_b_idx;
 		++tx_buffer;
-		
-		UDR = *tx_buffer;
-		
 		UCSRB |= (1 << UDRIE);
 	}
 }
@@ -129,9 +109,9 @@ ISR(USART_RXC_vect){
 		if (rx_b_idx == rx_reserve_size){
 			rx_status = 0;
 			if (c_reserve_type == TX_RX && rx_status == 0){
-				task_notify(tcb);
+				task_notify(uart_tcb);
 			}else{
-				task_notify(tcb);
+				task_notify(uart_tcb);
 			}
 		}else{
 			*rx_buffer = UDR;
