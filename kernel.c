@@ -12,13 +12,13 @@
 
 #include "kernel.h"
 #include "queue.h"
-#include "drivers/usart.h"
-#include "drivers/twi.h"
+#include "usart.h"
+#include "twi.h"
 
 uint8_t tcb_idx = 0;
-static struct tcb a_tcb[MAX_TASKS];
+struct tcb a_tcb[MAX_TASKS];
 
-void* start = (void *)RAMEND-0x20;
+void* start = (void *)RAMEND-0x64;
 void *_p = 0;
 void *_c_sp = 0;
 
@@ -28,7 +28,7 @@ task_fun sched = scheduler;
 struct queue  q_runnable;
 struct queue  q_wait;
 struct queue  q_blocked;
-struct queue  q_suspended;
+struct queue  q_master;
 
 volatile uint8_t k_tick = 1;
 
@@ -106,7 +106,7 @@ static void init_sp(task_fun f){
 	);
 }
 
-struct tcb *tcb;
+static struct tcb * k_tcb;
 
 static void context_restore() __attribute__((naked));
 static void context_restore(){
@@ -158,20 +158,16 @@ static void context_restore(){
 
 static inline void dispatch(void) __attribute__((always_inline));
 static inline void dispatch(void){
-	if (tcb->state == RESET){
-		start = tcb->sp_start;
-		init_sp(tcb->fun);
-		tcb->sp = _p;
-		_c_sp = tcb->sp;
+	if (k_tcb->type == PERODIC){
+		if (k_tcb->state == DELAYED || k_tcb->state == RESET){
+			start = k_tcb->sp_start;
+			init_sp(k_tcb->fun);
+			k_tcb->sp = _p;
+			_c_sp = k_tcb->sp;
+		}
 	}
 	
-	if (tcb->type == PERODIC && tcb->state != BLOCKED){
-		tcb->state = RESET;
-		tcb->c_queue = W;
-		enqueue(&q_wait, tcb);
-	}
-	
-	_c_sp = tcb->sp;
+	_c_sp = k_tcb->sp;
 	
 	TCNT1 = 0x00;
 	TIMSK = (1 << OCIE1A);
@@ -181,17 +177,22 @@ static inline void dispatch(void){
 
 static void scheduler(void){
 	if (k_tick){
+		update_q_master(&q_master, &q_wait, &q_runnable);
 		update_q_wait(&q_wait, &q_runnable);
 		update_q_blocked(&q_blocked, &q_runnable);
-		//update_q_runnable(&q_runnable);
+	}else{
+		if(k_tcb->state != SUSPENDED){
+			k_tcb->state = FINISHED;
+		}
 	}
 	
 	k_tick = 0;
 	
 	if (q_runnable.q_size > 0){
-		tcb = dequeue(&q_runnable);
+		k_tcb = dequeue(&q_runnable);
+		k_tcb->c_queue = M;
 	}else{
-		tcb = &a_tcb[0];
+		k_tcb = &a_tcb[0];
 	}
 	
 	TIMSK &= ~(1 << OCIE1A);
@@ -249,58 +250,68 @@ static inline void context_save(){
 	"st    x+, r0               \n\t"
 	"in    r0, __SP_H__         \n\t"
 	"st    x+, r0               \n\t"
+	);
+	k_tcb->sp = _c_sp;
+}
+
+ISR(TIMER1_COMPA_vect, ISR_NAKED){
+	context_save();
+	if (k_tcb->type != KERNEL){
+		k_tcb->sp = _c_sp;
+		k_tcb->state = SUSPENDED_K;
+	}
 	
+	k_tick = 1;
+	
+	k_tcb->tick_count += 1;
+	
+	__asm__(
 	"out	__SP_L__, %A0		\n\t"
 	"out	__SP_H__, %B0		\n\t"
 	"sei						\n\t"
 	:: "z" (RAMEND)
 	);
-	tcb->sp = _c_sp;
-}
-
-ISR(TIMER1_COMPA_vect, ISR_NAKED){
-	context_save();
-	if (tcb->state != RESET && tcb->state != TERMINATED){
-		tcb->sp = _c_sp;
-		
-		if (tcb->type != KERNEL){
-			if (tcb->state != BLOCKED && tcb->state != SUSPENDED){
-				tcb->state = SUSPENDED;
-			}
-			enqueue(&q_runnable, tcb);
-		}
-	}
-	
-	k_tick = 1;
-	
-	tcb->tick_count += 1;
-	
 	__asm__("ijmp				\n\t" :: "z"(scheduler));
 }
 
-void task_block(uint8_t desc) __attribute__((naked));
+void scheduler__() __attribute__((naked));
+void scheduler__(){
+	__asm__(
+	"out	__SP_L__, %A0		\n\t"
+	"out	__SP_H__, %B0		\n\t"
+	"sei						\n\t"
+	:: "z" (RAMEND)
+	);
+	__asm__("ijmp				\n\t" :: "z"(scheduler));
+}
+
+void reti__()__attribute__((naked));
+void reti__(){
+	__asm__("reti				\n\t");
+}
+
 void task_block(uint8_t desc){
 	context_save();
-	tcb->state = BLOCKED;
-	tcb->state_desc = desc;
-	enqueue(&q_blocked, tcb);
+	k_tcb->state = BLOCKED;
+	k_tcb->state_desc = desc;
+	enqueue(&q_blocked, k_tcb);
 	
-	__asm__("ijmp				\n\t" :: "z"(scheduler));
+	scheduler__();
 }
 
-void task_suspend() __attribute__((naked));
 void task_suspend(){
-	context_save();
-	
-	tcb->state = WAITING;
-	
-	__asm__("ijmp				\n\t" :: "z"(scheduler));
+	//k_tcb = get_current_tcb();
+	if (k_tcb->w_state == WORK_S){
+		k_tcb->state = SUSPENDED;
+		context_save();
+		scheduler__();
+	}
+	reti__();
 }
 
 void task_notify(struct tcb *t){
-	t->state = RUNNABLE;
-	
-	enqueue(&q_runnable, t);
+	t->state = READY;
+	t->c_queue = M;
 }
 
 void init_drivers(){
@@ -311,7 +322,7 @@ void init_drivers(){
 }
 
 struct tcb* get_current_tcb(){
-	return tcb;
+	return k_tcb;
 }
 
 uint8_t setup_task(){
@@ -324,15 +335,15 @@ uint8_t setup_task(){
 		a_tcb[tcb_idx].id = tcb_idx;
 		
 		if (a_tcb[tcb_idx].type != KERNEL){
-			if (a_tcb[tcb_idx].timer == 0){
-				a_tcb[tcb_idx].state = RUNNABLE;
-				a_tcb[tcb_idx].c_queue = R;
-				enqueue(&q_runnable, &a_tcb[tcb_idx]);
+			if (a_tcb[tcb_idx].delay == 0){
+				a_tcb[tcb_idx].m_state = READY;
+				a_tcb[tcb_idx].state = READY;
 			}else{
-				a_tcb[tcb_idx].state = WAITING;
-				a_tcb[tcb_idx].c_queue = W;
-				enqueue(&q_wait, &a_tcb[tcb_idx]);
+				a_tcb[tcb_idx].m_state = DELAYED;
+				a_tcb[tcb_idx].state = DELAYED;
 			}
+			enqueue(&q_master, &a_tcb[tcb_idx]);
+			a_tcb[tcb_idx].c_queue = M;
 		}
 		
 		++tcb_idx;
@@ -363,9 +374,10 @@ uint8_t create_task(task_fun fun, uint8_t type, uint16_t delay){
 void init_kernel(){
 	init_drivers();
 	
-	init_queue(&q_runnable);
-	init_queue(&q_wait);
-	init_queue(&q_blocked);
+	init_queue(&q_master, MASTER);
+	init_queue(&q_runnable, DEFAULT);
+	init_queue(&q_wait, DEFAULT);
+	init_queue(&q_blocked, DEFAULT);
 	
 	a_tcb[tcb_idx].fun = kernel_idle;
 	a_tcb[tcb_idx].type = KERNEL;

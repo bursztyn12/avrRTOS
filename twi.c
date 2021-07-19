@@ -5,16 +5,13 @@
  *  Author: bursztyn
  */ 
 
-#define F_CPU 1000000UL
-
 #include <avr/io.h>
-#include <util/delay.h>
 #include <avr/interrupt.h>
 #include "twi.h"
-#include "../kernel.h"
+#include "kernel.h"
 
 struct twi_packet twi_packet;
-static struct tcb *tcb;
+static struct tcb *twi_tcb;
 
 //volatile uint8_t flag = 1;
 uint8_t twi_mode = SINGLE_BYTE_READ;
@@ -28,12 +25,14 @@ void twi_init(){
 
 void twi_start(){
 	sei();
+	
+	twi_tcb->w_state = WORK_S;
+	
 	TWCR = (1 << TWEN) | (1 << TWIE) | (1 << TWINT) | (1 << TWSTA);
 	
 	task_suspend();
 	
-	//while(flag);
-	TWCR = 0;
+	TWCR = 0x00;
 }
 
 void twi_setup(uint8_t address, uint8_t *tx_buffer, uint8_t *rx_buffer, uint8_t tx_length, uint8_t rx_length, uint8_t mode){
@@ -44,7 +43,7 @@ void twi_setup(uint8_t address, uint8_t *tx_buffer, uint8_t *rx_buffer, uint8_t 
 	
 	twi_state = TWI_BUSY;
 	
-	tcb = get_current_tcb();
+	twi_tcb = get_current_tcb();
 	
 	twi_packet.address = address;
 	twi_packet.tx_buffer = tx_buffer;
@@ -71,8 +70,7 @@ ISR(TWI_vect){
 		if (twi_master_action == TWI_START){
 			twi_master_action = TWI_ADDRESS_W;
 		}else{
-			twi_packet.address |= (1 << 0);
-			//twi_packet.address += 1;
+			twi_packet.address += 1;
 			twi_master_action = TWI_ADDRESS_R;
 		}
 		
@@ -91,7 +89,7 @@ ISR(TWI_vect){
 			if (twi_mode == SINGLE_BYTE_WRITE || twi_mode == MULTIPLE_BYTE_WRITE){
 				//stop
 				TWCR = (1 << TWEN) | (1 << TWSTO) | (1 << TWINT);
-				task_notify(tcb);
+				task_notify(twi_tcb);
 			}else{
 				//reapeted start
 				twi_master_action = TWI_RP_START;
@@ -112,8 +110,9 @@ ISR(TWI_vect){
 		++twi_packet.rx_buffer;
 		++twi_packet.rx_idx;
 		if (twi_packet.rx_idx == twi_packet.rx_length){
+			PORTA |= (1 << 0);
 			TWCR = (1 << TWEN) | (1 << TWSTO) | (1 << TWINT);
-			task_notify(tcb);
+			task_notify(twi_tcb);
 		}else{
 			TWCR = (1 << TWEN) | (1 << TWIE) | (1 << TWINT) | (1 << TWEA);
 		}
