@@ -8,7 +8,6 @@
 #include "sds011.h"
 #include "usart.h"
 #include "kernel.h"
-#include "println.h"
 
 uint8_t sds011_state = SDS011_IDLE;
 uint8_t sds011_status = SDS011_WORK;
@@ -90,9 +89,6 @@ measurment_t* sds011_process_measurment(){
 	
 	m.pm2_5 = pm2_5v;
 	m.pm10 = pm10v;
-	
-	println_flo(pm2_5v);
-	println_flo(pm10v);
 	
 	return &m;
 }
