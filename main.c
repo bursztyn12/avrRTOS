@@ -17,11 +17,10 @@ void idle_0(){
 
 void idle_1(){
 	println_msg("P1");
-	println_flo(123.245);
 }
 
 void idle_3(){
-	sds011_sleep();
+	print_msg("P2");
 }
 
 void idle_4(){
@@ -32,7 +31,7 @@ void idle_4(){
 }
 
 void tmp(){
-	PORTA ^= (1 << 5);
+	PORTA ^= (1 << 6);
 	tmp102_init(GND);
 	float f = tmp102_get_temp();
 	println_flo(f);
@@ -46,7 +45,8 @@ int main(void){
 	//create_task(idle_0, PERODIC, 2);
 	//create_task(idle_4, PERODIC, 3);
 	//create_task(idle_1, PERODIC, 4);
-	create_task(tmp, PERODIC, 500);
+	create_task(tmp, PERODIC, 500, 0x50);
+	create_task(idle_0, PERODIC, 10, DEF_MEM_SIZE);
 	
 	start_kernel();
 }

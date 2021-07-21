@@ -9,8 +9,11 @@
 #include <avr/interrupt.h>
 #include "usart.h"
 #include "kernel.h"
+#include "mutex.h"
 
-static struct tcb* uart_tcb ;
+static struct tcb* usart_tcb ;
+static struct mutex usart_mtx;
+
 volatile uint8_t tx_status = 1;
 volatile uint8_t rx_status = 1;
 volatile uint8_t* tx_buffer;
@@ -30,6 +33,16 @@ uint8_t get_usart_state(){
 }
 
 void setup_usart(uint8_t *tx_b, uint8_t tx_size, uint8_t *rx_b, uint8_t rx_size, uint8_t type){
+	if (usart_state == USART_BUSY){
+		// put to blocked queue
+		task_block(USART_BLOCKED, &usart_mtx);
+	}
+	
+	usart_state = USART_BUSY;
+	
+	mutex_lock(&usart_mtx);
+	
+	
 	tx_buffer = tx_b;
 	tx_reserve_size = tx_size;
 	
@@ -43,17 +56,15 @@ void setup_usart(uint8_t *tx_b, uint8_t tx_size, uint8_t *rx_b, uint8_t rx_size,
 	}else if(type == TX || type == TX_RX){
 		usart_tx(type);
 	}
+	
+	mutex_unlock(&usart_mtx);
+	
+	usart_state = USART_IDLE;
 }
 
 void usart_tx(uint8_t type){
-	uart_tcb = get_current_tcb();
-	if (usart_state == USART_BUSY){
-		// put to blocked queue
-		task_block(USART_BLOCKED);
-	}
-	
-	uart_tcb->w_state = WORK_S;
-	usart_state = USART_BUSY;
+	usart_tcb = get_current_tcb();
+	usart_tcb->w_state = WORK_S;
 	
 	UDR = *tx_buffer;
 	
@@ -69,16 +80,15 @@ void usart_tx(uint8_t type){
 	
 	tx_b_idx = 0;
 	rx_b_idx = 0;
-	
-	usart_state = USART_IDLE;
 }
 
 void usart_rx(){
-	uart_tcb = get_current_tcb();
-	if(usart_state == USART_BUSY){
-		task_block(USART_BLOCKED);
-	}
+	usart_tcb = get_current_tcb();
+	
 	task_suspend();
+
+	rx_status = 1;
+	rx_b_idx = 0;
 }
 
 void usart_init(){
@@ -94,8 +104,8 @@ ISR(USART_UDRE_vect){
 	
 	if(tx_b_idx == tx_reserve_size){
 		tx_status = 0;
-		uart_tcb->w_state = WORK_F;
-		task_notify(uart_tcb);
+		usart_tcb->w_state = WORK_F;
+		task_notify(usart_tcb);
 	}else{
 		UDR = *tx_buffer;
 		++tx_b_idx;
@@ -109,9 +119,9 @@ ISR(USART_RXC_vect){
 		if (rx_b_idx == rx_reserve_size){
 			rx_status = 0;
 			if (c_reserve_type == TX_RX && rx_status == 0){
-				task_notify(uart_tcb);
+				task_notify(usart_tcb);
 			}else{
-				task_notify(uart_tcb);
+				task_notify(usart_tcb);
 			}
 		}else{
 			*rx_buffer = UDR;

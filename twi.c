@@ -7,11 +7,14 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <stddef.h>
 #include "twi.h"
 #include "kernel.h"
+#include "mutex.h"
 
 struct twi_packet twi_packet;
 static struct tcb *twi_tcb;
+static struct mutex mtx;
 
 //volatile uint8_t flag = 1;
 uint8_t twi_mode = SINGLE_BYTE_READ;
@@ -24,8 +27,7 @@ void twi_init(){
 }
 
 void twi_start(){
-	sei();
-	
+	twi_tcb = get_current_tcb();
 	twi_tcb->w_state = WORK_S;
 	
 	TWCR = (1 << TWEN) | (1 << TWIE) | (1 << TWINT) | (1 << TWSTA);
@@ -38,12 +40,12 @@ void twi_start(){
 void twi_setup(uint8_t address, uint8_t *tx_buffer, uint8_t *rx_buffer, uint8_t tx_length, uint8_t rx_length, uint8_t mode){
 	if (twi_state == TWI_BUSY){
 		// put to blocked queue
-		task_block(TWI_BLOCKED);
+		task_block(TWI_BLOCKED, &mtx);
 	}
 	
 	twi_state = TWI_BUSY;
 	
-	twi_tcb = get_current_tcb();
+	mutex_lock(&mtx);
 	
 	twi_packet.address = address;
 	twi_packet.tx_buffer = tx_buffer;
@@ -56,6 +58,8 @@ void twi_setup(uint8_t address, uint8_t *tx_buffer, uint8_t *rx_buffer, uint8_t 
 	twi_mode = mode;
 	
 	twi_start();
+	
+	mutex_unlock(&mtx);
 	
 	twi_state = TWI_IDLE;
 }
@@ -89,7 +93,6 @@ ISR(TWI_vect){
 			if (twi_mode == SINGLE_BYTE_WRITE || twi_mode == MULTIPLE_BYTE_WRITE){
 				//stop
 				TWCR = (1 << TWEN) | (1 << TWSTO) | (1 << TWINT);
-				uart_tcb->w_state = WORK_F;
 				task_notify(twi_tcb);
 			}else{
 				//reapeted start
@@ -111,9 +114,7 @@ ISR(TWI_vect){
 		++twi_packet.rx_buffer;
 		++twi_packet.rx_idx;
 		if (twi_packet.rx_idx == twi_packet.rx_length){
-			PORTA |= (1 << 0);
 			TWCR = (1 << TWEN) | (1 << TWSTO) | (1 << TWINT);
-			uart_tcb->w_state = WORK_F;
 			task_notify(twi_tcb);
 		}else{
 			TWCR = (1 << TWEN) | (1 << TWIE) | (1 << TWINT) | (1 << TWEA);

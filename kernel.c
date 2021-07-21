@@ -9,6 +9,7 @@
 
 #include <avr/interrupt.h>
 #include <util/delay.h>
+#include <stddef.h>
 
 #include "kernel.h"
 #include "queue.h"
@@ -16,9 +17,11 @@
 #include "twi.h"
 
 uint8_t tcb_idx = 0;
-struct tcb a_tcb[MAX_TASKS];
 
-void* start = (void *)RAMEND-0x64;
+struct tcb a_tcb[MAX_TASKS];
+struct memory a_memory[MAX_TASKS];
+
+void* start = (void *)RAMEND-0x30;
 void *_p = 0;
 void *_c_sp = 0;
 
@@ -108,6 +111,17 @@ static void init_sp(task_fun f){
 
 static struct tcb * k_tcb;
 
+void check_overflow(){
+	if (k_tcb != NULL){
+		uint8_t s = k_tcb->mem->sp_start - k_tcb->mem->sp;
+		if (s > k_tcb->mem->m_size){
+			//reset current tcb and next tcb
+			k_tcb->state = RESET;
+			k_tcb->m_next_tcb->state = RESET;
+		}
+	}
+}
+
 static void context_restore() __attribute__((naked));
 static void context_restore(){
 	__asm__(
@@ -158,16 +172,13 @@ static void context_restore(){
 
 static inline void dispatch(void) __attribute__((always_inline));
 static inline void dispatch(void){
-	if (k_tcb->type == PERODIC){
-		if (k_tcb->state == DELAYED || k_tcb->state == RESET){
-			start = k_tcb->sp_start;
-			init_sp(k_tcb->fun);
-			k_tcb->sp = _p;
-			_c_sp = k_tcb->sp;
-		}
+	if (k_tcb->state == RESET){
+		start = k_tcb->mem->sp_start;
+		init_sp(k_tcb->fun);
+		k_tcb->mem->sp = _p;
 	}
 	
-	_c_sp = k_tcb->sp;
+	_c_sp = k_tcb->mem->sp;
 	
 	TCNT1 = 0x00;
 	TIMSK = (1 << OCIE1A);
@@ -176,12 +187,19 @@ static inline void dispatch(void){
 }
 
 static void scheduler(void){
+	__asm__(
+	"out	__SP_L__, %A0		\n\t"
+	"out	__SP_H__, %B0		\n\t"
+	"sei						\n\t"
+	:: "z" (RAMEND)
+	);
+	check_overflow();
 	if (k_tick){
 		update_q_master(&q_master, &q_wait, &q_runnable);
 		update_q_wait(&q_wait, &q_runnable);
 		update_q_blocked(&q_blocked, &q_runnable);
 	}else{
-		if(k_tcb->state != SUSPENDED){
+		if(k_tcb->state != SUSPENDED && k_tcb->state != BLOCKED){
 			k_tcb->state = FINISHED;
 		}
 	}
@@ -251,13 +269,13 @@ static inline void context_save(){
 	"in    r0, __SP_H__         \n\t"
 	"st    x+, r0               \n\t"
 	);
-	k_tcb->sp = _c_sp;
+	k_tcb->mem->sp = _c_sp;
 }
 
 ISR(TIMER1_COMPA_vect, ISR_NAKED){
 	context_save();
 	if (k_tcb->type != KERNEL){
-		k_tcb->sp = _c_sp;
+		k_tcb->mem->sp = _c_sp;
 		k_tcb->state = SUSPENDED_K;
 	}
 	
@@ -265,23 +283,11 @@ ISR(TIMER1_COMPA_vect, ISR_NAKED){
 	
 	k_tcb->tick_count += 1;
 	
-	__asm__(
-	"out	__SP_L__, %A0		\n\t"
-	"out	__SP_H__, %B0		\n\t"
-	"sei						\n\t"
-	:: "z" (RAMEND)
-	);
 	__asm__("ijmp				\n\t" :: "z"(scheduler));
 }
 
 void scheduler__() __attribute__((naked));
 void scheduler__(){
-	__asm__(
-	"out	__SP_L__, %A0		\n\t"
-	"out	__SP_H__, %B0		\n\t"
-	"sei						\n\t"
-	:: "z" (RAMEND)
-	);
 	__asm__("ijmp				\n\t" :: "z"(scheduler));
 }
 
@@ -290,10 +296,13 @@ void reti__(){
 	__asm__("reti				\n\t");
 }
 
-void task_block(uint8_t desc){
+void task_block(uint8_t desc, struct mutex* mtx){
 	context_save();
 	k_tcb->state = BLOCKED;
 	k_tcb->state_desc = desc;
+	if (mtx != NULL){
+		k_tcb->mtx = mtx;
+	}
 	enqueue(&q_blocked, k_tcb);
 	
 	scheduler__();
@@ -325,12 +334,28 @@ struct tcb* get_current_tcb(){
 	return k_tcb;
 }
 
-uint8_t setup_task(){
+struct memory* find_mem(){
+	for (uint8_t i=0;i<MAX_TASKS;i++){
+		if (a_memory[i].m_state == FREE){
+			return &a_memory[i];
+		}
+	}
+	return NULL;
+}
+
+uint8_t setup_task(uint8_t mem_size){
 	if (tcb_idx < MAX_TASKS){
 		init_sp(a_tcb[tcb_idx].fun);
-		a_tcb[tcb_idx].sp = _p;
-		a_tcb[tcb_idx].sp_start = start;
-		start -= 0x40;
+		struct memory* mem = find_mem();
+		if (mem == NULL){
+			return 1;
+		}
+		mem->m_state = ALLOC;
+		mem->sp = _p;
+		mem->sp_start = start;
+		mem->m_size = mem_size;
+		a_tcb[tcb_idx].mem = mem;
+		start -= mem_size;
 		
 		a_tcb[tcb_idx].id = tcb_idx;
 		
@@ -352,7 +377,10 @@ uint8_t setup_task(){
 	return 1;
 }
 
-uint8_t create_task(task_fun fun, uint8_t type, uint16_t delay){
+uint8_t create_task(task_fun fun, uint8_t type, uint16_t delay, uint8_t mem_size){
+	if (mem_size < DEF_MEM_SIZE){
+		mem_size = DEF_MEM_SIZE;
+	}
 	if (type == PERODIC){
 		a_tcb[tcb_idx].type = PERODIC;
 		a_tcb[tcb_idx].delay = delay;
@@ -367,7 +395,7 @@ uint8_t create_task(task_fun fun, uint8_t type, uint16_t delay){
 	a_tcb[tcb_idx].fun = fun;
 	a_tcb[tcb_idx].timer = delay;
 	
-	return setup_task();
+	return setup_task(mem_size);
 }
 
 
@@ -381,7 +409,7 @@ void init_kernel(){
 	
 	a_tcb[tcb_idx].fun = kernel_idle;
 	a_tcb[tcb_idx].type = KERNEL;
-	setup_task();
+	setup_task(DEF_MEM_SIZE);
 }
 
 void start_kernel(){
