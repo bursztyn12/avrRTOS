@@ -4,16 +4,19 @@
  * Created: 08.07.2021 13:44:33
  *  Author: bursztyn
  */ 
-
+#include <stddef.h>
 #include "sds011.h"
 #include "usart.h"
 #include "kernel.h"
+#include "println.h"
+#include "mutex.h"
+
+static struct mutex mtx;
 
 uint8_t sds011_state = SDS011_IDLE;
 uint8_t sds011_status = SDS011_WORK;
 
 uint8_t new_measurment_available = 0;
-
 
 uint8_t m_sleep[19] = {0xAA, 0xB4, 0x06, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x05, 0xAB};
 uint8_t m_measure[19] = {0xAA, 0xB4, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x02, 0xAB};
@@ -28,15 +31,15 @@ measurment_t m = {
 
 struct tcb* tcb;
 
-void sds011_sleep(){
-	tcb = get_current_tcb();
-	
+void sds011_sleep(){	
 	if (sds011_state == SDS011_BUSY){
 		//put task to blocked queue
-		task_block(SDS011_BLOCKED);
+		task_block(SDS011_BLOCKED, &mtx);
 	}
 	
 	sds011_state = SDS011_BUSY;
+	
+	tcb = get_current_tcb();
 	
 	setup_usart(m_sleep, 18, 0, 0, TX);
 	
@@ -48,7 +51,7 @@ void sds011_measure(){
 	tcb = get_current_tcb();
 	if (sds011_state == SDS011_BUSY){
 		//put task to blocked queue
-		task_block(SDS011_BLOCKED);
+		task_block(SDS011_BLOCKED, &mtx);
 	}
 	
 	tcb->state = SUSPENDED;
@@ -67,7 +70,7 @@ void sds011_work(){
 	tcb = get_current_tcb();
 	if (sds011_state == SDS011_BUSY){
 		//put task to blocked queue
-		task_block(SDS011_BLOCKED);
+		task_block(SDS011_BLOCKED, &mtx);
 	}
 	
 	sds011_state = SDS011_BUSY;
@@ -89,6 +92,9 @@ measurment_t* sds011_process_measurment(){
 	
 	m.pm2_5 = pm2_5v;
 	m.pm10 = pm10v;
+	
+	println_flo(pm2_5v);
+	println_flo(pm10v);
 	
 	return &m;
 }

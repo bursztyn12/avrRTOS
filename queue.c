@@ -2,6 +2,7 @@
 #include "kernel.h"
 #include "queue.h"
 #include "usart.h"
+#include "mutex.h"
 
 void init_queue(struct queue  *q, uint8_t type){
     q->head = NULL;
@@ -52,6 +53,7 @@ void update_q(struct queue  *q, struct queue  *q_r, struct tcb *t, struct tcb *p
 			prev->next_tcb = t->next_tcb;
 		}else{
 			q->tail = prev;
+			prev->next_tcb = t->next_tcb;
 		}
 		q->q_size -= 1;
 		enqueue(q_r, t);
@@ -70,14 +72,21 @@ void update_q_blocked(struct queue  *q_b, struct queue  *q_r){
 		uint8_t i = 0;
 		struct tcb *t = q_b->head;
 		struct tcb *prev = 0;
+		uint8_t q_i = 0;
+		uint8_t q_s = q_b->q_size;
 		for(;i<q_size;i++){
-			if (t->state_desc == USART_BLOCKED){
-				if (get_usart_state()){
-					update_q(q_b, q_r, t, prev, i, q_size);
-				}
+			if (t->mtx->state == MTX_UNLOCKED){
+				update_q(q_b, q_r, t, prev, q_i, q_s);
 			}
 			prev = t;
-			t = t->next_tcb;
+			if(t->next_tcb == NULL){
+				t = q_b->head;
+				q_s = q_b->q_size;
+				q_i = 0;
+			}else{
+				++q_i;
+				t = t->next_tcb;
+			}
 		}
 	}
 }
@@ -96,7 +105,7 @@ void update_q_wait(struct queue  *q_w, struct queue  *q_r){
 				if (t->timer == 0){
 					if (t->type == PERODIC){
 						t->timer = t->delay;
-						t->state = DELAYED;
+						t->state = RESET;
 					}
 					update_q(q_w, q_r, t, prev, q_i, q_s);
 				}
@@ -150,7 +159,7 @@ void update_q_master(struct queue *q_m, struct queue  *q_w, struct queue  *q_r){
 				t->c_queue = R;
 				enqueue(q_r, t);
 			}else if(t->state == SUSPENDED_K){
-				if (t->m_state == DELAYED){
+				if (t->m_state == DELAYED && t->w_state == FINISHED){
 					t->c_queue = W;
 					enqueue(q_w, t);
 				}else{
@@ -163,12 +172,21 @@ void update_q_master(struct queue *q_m, struct queue  *q_w, struct queue  *q_r){
 			}else if (t->state == FINISHED){
 				if (t->m_state == DELAYED){
 					t->c_queue = W;
+					t->state = RESET;
 					enqueue(q_w, t);
 				}else if (t->m_state == READY && t->state != FINISHED){
 					t->state = RESET;
 					t->c_queue = R;
 					enqueue(q_r, t);
 				}
+			}else if (t->state == RESET){
+				if (t->m_state == DELAYED){
+					t->c_queue = W;
+					enqueue(q_w, t);
+				}else{
+					t->c_queue = R;
+					enqueue(q_r, t);
+			}
 			}
 		}
 		if (t->type != SINGLE){
